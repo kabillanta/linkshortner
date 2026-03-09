@@ -3,18 +3,23 @@
 import { useState } from "react";
 import { createShortUrl } from "./actions";
 import {
-  Link as LinkIcon,
+  Link2,
   ArrowRight,
   Copy,
   CheckCircle,
   AlertCircle,
+  LayoutGrid,
   QrCode,
+  ShieldAlert,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import Link from "next/link";
+import SignOutButton from "@/components/SignOutButton";
 
 export default function Home() {
   const [url, setUrl] = useState("");
   const [alias, setAlias] = useState("");
+  const [maxClicks, setMaxClicks] = useState(""); // NEW: State for click limit
   const [shortCode, setShortCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,6 +34,7 @@ export default function Home() {
     const formData = new FormData();
     formData.append("url", url);
     formData.append("alias", alias);
+    if (maxClicks) formData.append("maxClicks", maxClicks); // NEW: Send limit to backend
 
     const result = await createShortUrl(formData);
 
@@ -36,8 +42,9 @@ export default function Home() {
       setError(result.error);
     } else if (result.shortCode) {
       setShortCode(result.shortCode);
-      setUrl(""); // Clear form on success
+      setUrl("");
       setAlias("");
+      setMaxClicks("");
     }
     setLoading(false);
   };
@@ -54,74 +61,125 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-zinc-950 text-white">
-      <div className="w-full max-w-xl space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">
-            Advanced Link Engine
+    <main className="relative flex min-h-screen flex-col items-center justify-center bg-black text-white selection:bg-white/30 overflow-hidden font-sans">
+      {/* Background Radial Glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-white/[0.02] rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Top Navbar */}
+      <nav className="absolute top-0 w-full border-b border-white/5 bg-transparent z-40">
+        <div className="mx-auto max-w-7xl flex items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-2">
+            <div className="bg-white text-black p-1.5 rounded-full">
+              <Link2 className="h-5 w-5" />
+            </div>
+            <span className="text-xl font-bold tracking-tight">Cognito</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-black px-5 py-2 text-sm font-medium text-white hover:bg-white/10 transition-all duration-300"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Dashboard
+            </Link>
+            <SignOutButton />
+          </div>
+        </div>
+      </nav>
+
+      <div className="z-10 w-full max-w-4xl px-6 flex flex-col items-center mt-12">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 mb-8 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-zinc-300">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-500"></span>
+          </span>
+          Neural-Engine Active{" "}
+          <ArrowRight className="h-3 w-3 ml-1 opacity-50" />
+        </div>
+
+        <div className="text-center space-y-1 mb-10 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 fill-mode-both">
+          <h1 className="text-6xl md:text-[5.5rem] font-extrabold tracking-tighter leading-none">
+            <span className="block text-white">Link shorter.</span>
+            <span className="block text-[#666666]">Impact larger.</span>
           </h1>
-          <p className="text-zinc-400">
-            Custom aliases, QR codes, and edge routing.
+          <p className="mx-auto max-w-xl text-lg text-[#888888] mt-6 font-medium">
+            Strip away the noise. Create concise URLs, track global engagement,
+            and dominate your analytics.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="relative">
-            <LinkIcon className="absolute left-3 top-3.5 h-5 w-5 text-zinc-500" />
+        <form
+          onSubmit={handleSubmit}
+          className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-both space-y-4"
+        >
+          <div className="relative flex items-center w-full rounded-full border border-white/10 bg-[#0A0A0A] p-1.5 transition-all focus-within:border-white/20 focus-within:bg-[#111111]">
+            <Link2 className="absolute left-6 h-5 w-5 text-zinc-600" />
             <input
               type="url"
               required
-              placeholder="Paste your long URL here..."
+              placeholder="https://your-long-url.com..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-10 py-3 text-white placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+              className="w-full bg-transparent pl-14 pr-36 py-4 text-white placeholder-zinc-600 focus:outline-none"
             />
-          </div>
-
-          <div className="flex gap-4 flex-col sm:flex-row">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-3 text-zinc-500 font-mono text-sm">
-                /
-              </span>
-              <input
-                type="text"
-                placeholder="custom-alias (optional)"
-                value={alias}
-                onChange={(e) => setAlias(e.target.value)}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-8 py-3 text-white placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-sm transition-all"
-              />
-            </div>
-
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center justify-center rounded-lg bg-blue-600 px-8 py-3 font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors sm:w-auto w-full"
+              className="absolute right-2 flex h-[80%] items-center justify-center rounded-full bg-white px-6 font-medium text-black hover:bg-zinc-200 disabled:opacity-50 transition-all active:scale-95"
             >
-              {loading ? "Processing..." : "Shorten"}
+              {loading ? "Routing..." : "Shorten"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </button>
           </div>
 
+          {/* NEW: Secondary Inputs (Alias & Limit) */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm opacity-60 focus-within:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 font-mono">/</span>
+              <input
+                type="text"
+                placeholder="custom-alias"
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
+                className="w-40 border-b border-white/10 bg-transparent py-1 text-white placeholder-zinc-700 focus:border-cyan-500 focus:outline-none transition-colors font-mono text-center"
+              />
+            </div>
+
+            <div className="hidden sm:block w-px h-4 bg-white/10"></div>
+
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-zinc-500" />
+              <input
+                type="number"
+                min="1"
+                placeholder="Max Clicks (optional)"
+                value={maxClicks}
+                onChange={(e) => setMaxClicks(e.target.value)}
+                className="w-40 border-b border-white/10 bg-transparent py-1 text-white placeholder-zinc-700 focus:border-cyan-500 focus:outline-none transition-colors text-center"
+              />
+            </div>
+          </div>
+
           {error && (
-            <div className="flex items-center text-red-400 text-sm mt-2 bg-red-400/10 p-3 rounded-lg border border-red-400/20">
+            <div className="flex items-center justify-center text-red-400 text-sm mt-4 animate-in fade-in">
               <AlertCircle className="w-4 h-4 mr-2" />
               {error}
             </div>
           )}
         </form>
 
+        {/* Modal display code remains the same... */}
         {shortCode && (
-          <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h3 className="mb-4 text-sm font-medium text-zinc-400 uppercase tracking-wider">
-              Your Link is Ready
+          <div className="mt-12 w-full max-w-lg rounded-3xl border border-white/10 bg-white/[0.02] p-6 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h3 className="mb-4 text-xs font-medium text-zinc-500 uppercase tracking-widest text-center">
+              Payload Deployed
             </h3>
 
             <div className="flex flex-col sm:flex-row gap-6 items-center">
-              {/* QR Code Display */}
-              <div className="bg-white p-3 rounded-xl shadow-inner flex-shrink-0">
+              <div className="rounded-2xl bg-white p-2 border-4 border-white/5 flex-shrink-0">
                 <QRCodeSVG
                   value={fullShortUrl}
-                  size={120}
+                  size={90}
                   bgColor={"#ffffff"}
                   fgColor={"#000000"}
                   level={"Q"}
@@ -130,25 +188,23 @@ export default function Home() {
               </div>
 
               <div className="flex-1 w-full space-y-4">
-                <div className="flex items-center justify-between rounded-lg bg-black p-4 border border-zinc-800 shadow-inner">
-                  <span className="text-blue-400 font-mono truncate mr-4">
+                <div className="flex items-center justify-between rounded-xl bg-black p-3 border border-white/10 shadow-inner">
+                  <span className="text-white font-mono truncate mr-4 text-sm">
                     {fullShortUrl}
                   </span>
                   <button
                     onClick={copyToClipboard}
-                    className="flex-shrink-0 rounded-md bg-zinc-800 p-2 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors"
-                    title="Copy to clipboard"
+                    className="flex-shrink-0 rounded-lg bg-white/10 p-2 text-white hover:bg-white/20 transition-all active:scale-95"
                   >
                     {copied ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <CheckCircle className="h-4 w-4 text-green-400" />
                     ) : (
-                      <Copy className="h-5 w-5" />
+                      <Copy className="h-4 w-4" />
                     )}
                   </button>
                 </div>
                 <p className="text-xs text-zinc-500 flex items-center">
-                  <QrCode className="w-3 h-3 mr-1" /> Scan the QR code or copy
-                  the link to share.
+                  <QrCode className="w-3 h-3 mr-1" /> Ready for distribution.
                 </p>
               </div>
             </div>

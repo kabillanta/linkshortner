@@ -4,20 +4,13 @@ import { supabase } from "@/lib/supabase";
 import { redis } from "@/lib/redis";
 import { z } from "zod";
 
-// Zod schema for strict validation
 const urlSchema = z.object({
   url: z.string().url({ message: "Please enter a valid URL." }),
-  alias: z
-    .string()
-    .min(3, { message: "Alias must be at least 3 characters." })
-    .max(30, { message: "Alias is too long." })
-    .regex(/^[a-zA-Z0-9-]+$/, {
-      message: "Alias can only contain letters, numbers, and hyphens.",
-    })
-    .optional()
-    .or(z.literal("")), // Allow empty string
+  alias: z.string().max(30).optional().or(z.literal("")),
+  maxClicks: z.number().positive().optional().or(z.nan()), // New optional limit
 });
 
+// THE MISSING FUNCTION: Generates the random 6-character string
 function generateShortCode() {
   const chars =
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -29,39 +22,98 @@ function generateShortCode() {
 export async function createShortUrl(formData: FormData) {
   const rawUrl = formData.get("url") as string;
   const rawAlias = formData.get("alias") as string;
+  const rawMaxClicks = formData.get("maxClicks") as string;
 
-  // 1. Validate Input
-  const parsed = urlSchema.safeParse({ url: rawUrl, alias: rawAlias });
-  if (!parsed.success) {
+  const maxClicks = rawMaxClicks ? parseInt(rawMaxClicks, 10) : undefined;
+
+  const parsed = urlSchema.safeParse({
+    url: rawUrl,
+    alias: rawAlias,
+    maxClicks,
+  });
+  if (!parsed.success)
     return { error: (parsed.error as any).errors[0].message };
-  }
 
   const originalUrl = parsed.data.url;
   const shortCode = parsed.data.alias || generateShortCode();
 
-  // 2. Check for Alias Collisions in Supabase
-  const { data: existing } = await supabase
-    .from("urls")
-    .select("short_code")
-    .eq("short_code", shortCode)
-    .single();
+  // Save to DB with new max_clicks field
+  const { error: dbError } = await supabase.from("urls").insert([
+    {
+      short_code: shortCode,
+      original_url: originalUrl,
+      max_clicks: parsed.data.maxClicks || null,
+    },
+  ]);
 
-  if (existing) {
-    return { error: "That custom alias is already taken. Try another one!" };
-  }
+  if (dbError) return { error: "Alias already taken or database error." };
 
-  // 3. Save to Supabase
-  const { error: dbError } = await supabase
-    .from("urls")
-    .insert([{ short_code: shortCode, original_url: originalUrl }]);
-
-  if (dbError) {
-    console.error("Database Error:", dbError);
-    return { error: "Failed to save to database." };
-  }
-
-  // 4. Cache in Redis
-  await redis.set(`url:${shortCode}`, originalUrl);
+  // Cache object in Redis instead of just string
+  await redis.set(
+    `url:${shortCode}`,
+    JSON.stringify({
+      originalUrl,
+      isActive: true,
+      maxClicks: parsed.data.maxClicks || null,
+    }),
+  );
 
   return { shortCode, originalUrl };
+}
+
+// Toggle Link Status
+export async function toggleLinkStatus(
+  shortCode: string,
+  currentStatus: boolean,
+) {
+  const newStatus = !currentStatus;
+
+  const { data, error } = await supabase
+    .from("urls")
+    .update({ is_active: newStatus })
+    .eq("short_code", shortCode)
+    .select()
+    .single();
+
+  if (!error && data) {
+    // Update Edge Cache
+    await redis.set(
+      `url:${shortCode}`,
+      JSON.stringify({
+        originalUrl: data.original_url,
+        isActive: data.is_active,
+        maxClicks: data.max_clicks,
+      }),
+    );
+  }
+  return { success: !error };
+}
+
+// Edit Destination URL
+export async function updateDestination(shortCode: string, newUrl: string) {
+  try {
+    new URL(newUrl); // Validate
+  } catch {
+    return { error: "Invalid URL format" };
+  }
+
+  const { data, error } = await supabase
+    .from("urls")
+    .update({ original_url: newUrl })
+    .eq("short_code", shortCode)
+    .select()
+    .single();
+
+  if (!error && data) {
+    // Update Edge Cache
+    await redis.set(
+      `url:${shortCode}`,
+      JSON.stringify({
+        originalUrl: data.original_url,
+        isActive: data.is_active,
+        maxClicks: data.max_clicks,
+      }),
+    );
+  }
+  return { success: !error };
 }
