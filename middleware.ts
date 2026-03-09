@@ -23,8 +23,8 @@ export async function middleware(req: NextRequest) {
   if (originalUrl) {
     // 2. Fire and forget analytics to Supabase via Edge compatible fetch
     // We don't await this so the redirect isn't blocked
-    const country = req.geo?.country || "Unknown";
-    const city = req.geo?.city || "Unknown";
+    const country = req.headers.get("x-vercel-ip-country") || "Unknown";
+    const city = req.headers.get("x-vercel-ip-city") || "Unknown";
     const userAgent = req.headers.get("user-agent") || "";
     const device = userAgent.includes("Mobile") ? "Mobile" : "Desktop";
 

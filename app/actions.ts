@@ -33,7 +33,7 @@ export async function createShortUrl(formData: FormData) {
   // 1. Validate Input
   const parsed = urlSchema.safeParse({ url: rawUrl, alias: rawAlias });
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
+    return { error: (parsed.error as any).errors[0].message };
   }
 
   const originalUrl = parsed.data.url;
